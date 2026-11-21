@@ -47,7 +47,7 @@ For a smaller CPU-only PyTorch installation, run this before installing the othe
 python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
 ```
 
-`requirements-tested.txt` records the exact Windows/Python 3.13 CPU environment used for verification. `requirements.txt` uses compatible version ranges for portability.
+`requirements-tested.txt` records the exact Windows/Python 3.13 CPU environment used for verification. To install that environment, use `python -m pip install -r requirements-tested.txt --extra-index-url https://download.pytorch.org/whl/cpu`. `requirements.txt` uses compatible version ranges for portability.
 
 ## Demonstration in one minute
 
