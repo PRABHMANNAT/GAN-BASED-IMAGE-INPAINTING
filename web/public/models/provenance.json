@@ -1,0 +1,25 @@
+{
+  "architecture": "edge-unet-v1",
+  "kind": "educational GAN; not the report's trained model",
+  "training_data": "procedural facade illustrations only",
+  "seed": 42,
+  "training_size": 64,
+  "batch_size": 8,
+  "requested_steps": 300,
+  "learning_rate_g": 0.0003,
+  "learning_rate_d": 0.0001,
+  "loss": "10*hole_L1 + valid_L1 + 2*gradient_L1 + 0.05*adversarial_BCE",
+  "validation": "8 fixed synthetic image-mask pairs",
+  "limitations": "Tiny teaching model. Not validated for historical photographs; may blur or invent details.",
+  "selected_step": 275,
+  "validation_masked_mse": 0.03407237306237221,
+  "checkpoint_sha256": "1d775fdddf7a6bde5be5cbf3e42f7f956fbe31ecbfebb57c4b8ee1cee967ab2c",
+  "onnx_opset": 17,
+  "export_max_absolute_error": 3.5762786865234375e-07,
+  "input_shape": [
+    1,
+    5,
+    256,
+    256
+  ]
+}

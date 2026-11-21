@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      name="description"
+      content="Restore scratches and missing regions in photographs with Reframe Studio. Private, on-device image inpainting with OpenCV and an educational GAN."
+    />
+    <meta name="theme-color" content="#122d29" />
+    <title>Reframe Studio — Image Restoration</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script type="module" src="/src/main.js"></script>
+  </head>
+  <body>
+    <header class="header">
+      <a href="/" class="brand"
+        ><span class="brand-icon"><i data-lucide="scan-line"></i></span
+        >reframe<span class="brand-light">studio</span></a
+      >
+      <nav>
+        <button id="guide-open" class="quiet">
+          <i data-lucide="book-open"></i>Quick guide</button
+        ><a
+          class="quiet github"
+          href="https://github.com/PRABHMANNAT/GAN-BASED-IMAGE-INPAINTING"
+          target="_blank"
+          rel="noreferrer"
+          ><i data-lucide="github"></i>Source code</a
+        ><span class="privacy-pill"
+          ><i data-lucide="shield-check"></i>100% on-device</span
+        >
+      </nav>
+    </header>
+    <main>
+      <section class="intro">
+        <div>
+          <p class="eyebrow">A SECOND CHANCE FOR EVERY IMAGE</p>
+          <h1>Restore the detail. <em>Keep the story.</em></h1>
+          <p>
+            A thoughtful workspace for repairing scratches, filling gaps, and
+            bringing your images back into focus.
+          </p>
+        </div>
+        <span class="version"><i data-lucide="sparkles"></i>STUDIO 2.0</span>
+      </section>
+      <section class="studio" aria-label="Image restoration studio">
+        <aside class="library">
+          <div class="panel-title">
+            <span>Your image</span><i data-lucide="image"></i>
+          </div>
+          <label for="image-upload" class="dropzone" id="dropzone"
+            ><span class="upload-symbol"
+              ><i data-lucide="upload-cloud"></i></span
+            ><strong>Drop your image here</strong
+            ><span>or <u>browse files</u></span
+            ><small>JPG, PNG, WebP · up to 20 MB</small></label
+          ><input
+            hidden
+            id="image-upload"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+          />
+          <div class="file-card">
+            <img id="file-thumb" alt="Current image thumbnail" />
+            <div>
+              <strong id="filename">Heritage facade</strong
+              ><span id="file-size">Sample illustration</span>
+            </div>
+            <span class="file-tag">RGB</span>
+          </div>
+          <div class="panel-title spaced">
+            <span>Try a sample</span
+            ><span class="subtle">NO UPLOAD NEEDED</span>
+          </div>
+          <div class="samples">
+            <button class="sample active" data-sample="facade">
+              <img
+                src="/samples/facade.jpg"
+                alt="Heritage facade illustration"
+              /><span>Heritage facade</span></button
+            ><button class="sample" data-sample="coast">
+              <img
+                src="/samples/coast.jpg"
+                alt="Coastal landscape illustration"
+              /><span>Coastal study</span>
+            </button>
+          </div>
+          <div class="line"></div>
+          <div class="panel-title">
+            <span>Mask assistance</span><i data-lucide="wand-sparkles"></i>
+          </div>
+          <p class="small-copy">
+            Start with a suggestion, then refine it with the brush.
+          </p>
+          <button id="detect" class="outlined full">
+            <i data-lucide="scan-search"></i>Detect thin scratches
+          </button>
+          <label class="range-caption" for="sensitivity"
+            >Detection sensitivity
+            <output id="sensitivity-value">35</output></label
+          ><input id="sensitivity" type="range" min="10" max="80" value="35" />
+          <div class="two-buttons">
+            <button id="preset-scratch" class="outlined">Add scratches</button
+            ><button id="preset-hole" class="outlined">Add a gap</button>
+          </div>
+          <div class="mask-actions">
+            <button id="import-mask" class="link-button">Import mask</button
+            ><button id="save-mask" class="link-button">Save mask</button>
+          </div>
+          <input
+            hidden
+            id="mask-upload"
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+          />
+          <div class="privacy-note">
+            <i data-lucide="lock-keyhole"></i>
+            <p>
+              <strong>Your photos stay yours.</strong>Everything runs in your
+              browser. No uploads, accounts, or API keys.
+            </p>
+          </div>
+        </aside>
+        <section class="editor">
+          <div class="editor-top">
+            <div class="view-tabs" role="group" aria-label="Workspace view">
+              <button class="active" id="edit-view" aria-pressed="true">
+                <i data-lucide="paintbrush"></i>Edit mask</button
+              ><button id="compare-view" aria-pressed="false" disabled>
+                <i data-lucide="columns-2"></i>Compare
+              </button>
+            </div>
+            <span class="canvas-size" id="canvas-size">Loading…</span>
+          </div>
+          <div class="toolbar">
+            <div class="tools" role="group" aria-label="Drawing tools">
+              <button
+                class="icon-button active"
+                data-tool="brush"
+                aria-label="Brush (B)"
+                title="Brush (B)"
+              >
+                <i data-lucide="paintbrush"></i></button
+              ><button
+                class="icon-button"
+                data-tool="eraser"
+                aria-label="Eraser (E)"
+                title="Eraser (E)"
+              >
+                <i data-lucide="eraser"></i></button
+              ><button
+                class="icon-button"
+                data-tool="rectangle"
+                aria-label="Rectangle (R)"
+                title="Rectangle (R)"
+              >
+                <i data-lucide="square-dashed"></i></button
+              ><button
+                class="icon-button"
+                data-tool="pan"
+                aria-label="Pan (H)"
+                title="Pan (H)"
+              >
+                <i data-lucide="hand"></i></button
+              ><span class="toolbar-divider"></span
+              ><button
+                class="icon-button"
+                id="undo"
+                aria-label="Undo (Ctrl+Z)"
+                title="Undo (Ctrl+Z)"
+                disabled
+              >
+                <i data-lucide="undo-2"></i></button
+              ><button
+                class="icon-button"
+                id="redo"
+                aria-label="Redo (Ctrl+Shift+Z)"
+                title="Redo (Ctrl+Shift+Z)"
+                disabled
+              >
+                <i data-lucide="redo-2"></i>
+              </button>
+            </div>
+            <button id="clear" class="clear-button">
+              <i data-lucide="trash-2"></i>Clear
+            </button>
+          </div>
+          <div class="canvas-viewport" id="viewport">
+            <span class="canvas-label" id="canvas-label"
+              ><span></span>MASKING WORKSPACE</span
+            >
+            <div id="image-stage" class="image-stage">
+              <canvas id="image-canvas" aria-label="Current image"></canvas
+              ><canvas
+                id="result-canvas"
+                hidden
+                aria-label="Restored image"
+              ></canvas
+              ><canvas
+                id="mask-canvas"
+                aria-label="Paint damaged regions on this canvas"
+              ></canvas>
+              <div id="compare-line" class="compare-line" hidden>
+                <span><i data-lucide="move-horizontal"></i></span>
+              </div>
+              <div class="compare-labels" id="compare-labels" hidden>
+                <span>ORIGINAL</span><span>RESTORED</span>
+              </div>
+            </div>
+            <div id="busy-overlay" class="busy-overlay" hidden>
+              <div class="spinner"></div>
+              <strong id="busy-label">Loading image…</strong
+              ><span>Processing on your device</span>
+            </div>
+            <div class="zoom-controls">
+              <button id="zoom-out" aria-label="Zoom out">
+                <i data-lucide="minus"></i></button
+              ><span id="zoom-value">Fit</span
+              ><button id="zoom-in" aria-label="Zoom in">
+                <i data-lucide="plus"></i></button
+              ><span class="toolbar-divider"></span
+              ><button id="fit" aria-label="Fit image">
+                <i data-lucide="maximize"></i>
+              </button>
+            </div>
+          </div>
+          <div class="canvas-bottom">
+            <span
+              ><span class="coral-dot"></span
+              ><span id="canvas-hint"
+                >Paint over the regions you want to repair</span
+              ></span
+            ><label class="mask-toggle"
+              ><input id="show-mask" type="checkbox" checked />Show mask</label
+            >
+          </div>
+          <div class="compare-control" id="compare-control" hidden>
+            <label for="compare-range">Original</label
+            ><input
+              id="compare-range"
+              type="range"
+              min="0"
+              max="100"
+              value="50"
+              aria-label="Before and after comparison"
+            /><span>Restored</span>
+          </div>
+          <div class="workspace-status">
+            <span class="engine-state" id="engine-state"
+              ><span class="loading-dot"></span>Loading repair engine</span
+            ><span id="mask-coverage">0% selected</span
+            ><span id="processing-time">—</span>
+          </div>
+          <div class="result-stats" id="result-stats" hidden></div>
+        </section>
+        <aside class="inspector">
+          <div class="panel-title">
+            <span>Restoration settings</span
+            ><i data-lucide="sliders-horizontal"></i>
+          </div>
+          <label class="field-label" for="method">Repair method</label
+          ><select id="method">
+            <option value="migan">AI repair · Pretrained MI-GAN</option>
+            <option value="context">Fast repair · Context fill</option>
+            <option value="gan">Edge-guided GAN · Teaching model</option>
+          </select>
+          <p class="method-description" id="method-description">
+            Pretrained on natural scenes. Reconstructs plausible detail for
+            missing areas. Downloads once on first use.
+          </p>
+          <div class="line"></div>
+          <label class="range-caption" for="brush-size"
+            >Brush size <output id="brush-size-value">24 px</output></label
+          ><input id="brush-size" type="range" min="2" max="120" value="24" />
+          <div class="brush-preview">
+            <span id="brush-preview-dot"></span
+            ><span>Use [ and ] to resize</span>
+          </div>
+          <label class="range-caption" for="radius"
+            >Repair radius <output id="radius-value">4 px</output></label
+          ><input id="radius" type="range" min="1" max="15" value="4" />
+          <p class="help-copy">Small for scratches. Increase for wider gaps.</p>
+          <label class="range-caption" for="feather"
+            >Edge softness <output id="feather-value">0 px</output></label
+          ><input id="feather" type="range" min="0" max="8" value="0" />
+          <p class="help-copy">Blends inward from the mask boundary.</p>
+          <label class="range-caption" for="strength"
+            >Repair strength <output id="strength-value">100%</output></label
+          ><input id="strength" type="range" min="20" max="100" value="100" />
+          <div class="line"></div>
+          <label class="reference-check"
+            ><input type="checkbox" id="clean-reference" checked /><span
+              >Clean reference available<small
+                >Enable only for simulated damage on a clean original. Shows
+                PSNR scores.</small
+              ></span
+            ></label
+          >
+          <button id="restore" class="restore-button full">
+            <i data-lucide="sparkles"></i><span>Restore image</span><kbd>↵</kbd>
+          </button>
+          <p id="feedback" class="feedback" role="status" aria-live="polite">
+            Choose a sample or upload an image to begin.
+          </p>
+          <div class="export-section">
+            <div class="panel-title">
+              <span>Export your result</span><i data-lucide="download"></i>
+            </div>
+            <button id="download-result" class="outlined full" disabled>
+              <i data-lucide="download"></i>Download restored PNG</button
+            ><button id="download-record" class="link-button full" disabled>
+              Download processing record
+            </button>
+          </div>
+        </aside>
+      </section>
+      <section class="under-studio">
+        <span
+          ><i data-lucide="mouse-pointer-2"></i>Brush to select <b>·</b> Scroll
+          to zoom <b>·</b> Space + drag to pan</span
+        ><span
+          ><i data-lucide="check-check"></i>Original pixels preserved outside
+          the mask</span
+        >
+      </section>
+      <section class="notes">
+        <div class="note-heading">
+          <span class="eyebrow">BUILT WITH CONTEXT</span>
+          <h2>A repair you can understand.</h2>
+        </div>
+        <div>
+          <i data-lucide="scan-line"></i>
+          <h3>Mark what’s missing</h3>
+          <p>
+            Draw a precise mask or start with automatic scratch detection.
+            Refine every selection.
+          </p>
+        </div>
+        <div>
+          <i data-lucide="cpu"></i>
+          <h3>Choose the right approach</h3>
+          <p>
+            Pretrained MI-GAN, fast context fill, or an edge-guided teaching
+            model. All run on your device.
+          </p>
+        </div>
+        <div>
+          <i data-lucide="split"></i>
+          <h3>Review the difference</h3>
+          <p>
+            Use the comparison slider and export a traceable result. AI creates
+            plausible details; always review them.
+          </p>
+        </div>
+      </section>
+    </main>
+    <footer>
+      <span class="footer-brand"
+        >reframe studio <span>/ IMAGE INPAINTING</span></span
+      ><span
+        >Independent educational project · Review generated details before
+        use</span
+      >
+    </footer>
+    <dialog id="guide">
+      <div class="dialog-heading">
+        <h2>A quick restoration guide</h2>
+        <button id="guide-close" class="icon-button" aria-label="Close guide">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <ol>
+        <li>
+          <strong>Choose your image.</strong> The app processes a working copy
+          up to 1,200 pixels wide or high.
+        </li>
+        <li>
+          <strong>Mark the damage.</strong> Use brush, rectangle, or automatic
+          scratch suggestions. Erase areas you want to keep.
+        </li>
+        <li>
+          <strong>Restore.</strong> AI repair uses pretrained MI-GAN for natural
+          scenes. Fast repair fills from nearby pixels. The separate edge-guided
+          GAN is a small teaching model.
+        </li>
+        <li>
+          <strong>Compare and export.</strong> Move the slider, inspect the
+          details, and download your candidate and its processing record.
+        </li>
+      </ol>
+      <p>
+        Keyboard: B brush · E eraser · R rectangle · H pan · [ / ] brush size ·
+        Ctrl/Cmd+Z undo · Ctrl/Cmd+Shift+Z redo · Enter restore. Import mask
+        uses white for regions to repair.
+      </p>
+      <p>
+        Automatic detection can select legitimate image details. Review its
+        suggestions. Neither GAN reproduces the trained model in the supplied
+        project report. MI-GAN is pretrained by Picsart AI Research on Places2;
+        the teaching model uses synthetic illustrations.
+      </p>
+      <button class="restore-button" id="guide-done">Start restoring</button>
+    </dialog>
+    <div class="toast" id="toast" role="status" hidden></div>
+  </body>
+</html>

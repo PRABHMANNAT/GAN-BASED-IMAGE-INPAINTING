@@ -1,0 +1,12 @@
+{
+  "name": "MI-GAN-512-Places2 pretrained pipeline v2",
+  "authors": "Picsart AI Research; Andranik Sargsyan et al.",
+  "source": "https://github.com/Picsart-AI-Research/MI-GAN",
+  "download": "https://huggingface.co/andraniksargsyan/migan/resolve/main/migan_pipeline_v2.onnx",
+  "license": "MIT; see MI-GAN-LICENSE.txt",
+  "sha256": "6f1f3530a1a2324b19752018ce756088b07973cda8d7d890034ace5c8a48c40b",
+  "bytes": 28079181,
+  "training_data": "Places2; third-party pretrained model",
+  "pipeline_mask_convention": "255 known, 0 missing; UI mask is inverted at the model boundary",
+  "limitations": "Generates plausible candidates, not historical ground truth. Not the model from the supplied project report."
+}

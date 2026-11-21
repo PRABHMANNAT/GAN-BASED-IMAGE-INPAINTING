@@ -7,3 +7,9 @@ uploads/
 training-runs/
 .env
 *.log
+node_modules/
+web/dist/
+web/public/runtime/
+.vercel/
+test-results/
+playwright-report/

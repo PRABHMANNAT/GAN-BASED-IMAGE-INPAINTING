@@ -1,0 +1,16 @@
+{
+  "name": "reframe-studio-workspace",
+  "version": "2.0.0",
+  "private": true,
+  "scripts": {
+    "postinstall": "npm --prefix web ci",
+    "dev": "npm --prefix web run prepare && npm --prefix web run dev --",
+    "build": "npm --prefix web run build",
+    "preview": "npm --prefix web run preview --",
+    "test": "npm --prefix web test",
+    "test:browser": "npm --prefix web run test:browser"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
