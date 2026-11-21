@@ -4,7 +4,33 @@
 
 Reframe is a browser-based editor for repairing scratches, removing small unwanted objects, and filling damaged regions of an image. Select an area, run a repair, compare the result, and apply it before continuing. Images stay in the browser; the application does not upload them to a server.
 
+| Project | Details |
+| --- | --- |
+| Current version | 3.0.0 |
+| Author | PRABHMANNAT SINGH |
+| Application license | [MIT](LICENSE) |
+| Runs on | A local computer or a static web host such as Vercel |
+| Requirements | Node.js 22.12+ for setup; a modern browser for editing |
+| Backend / API keys | None |
+
 ![Reframe photo editor](docs/reframe-editor.png)
+
+[Get started](#quick-start) · [Use the editor](#using-the-editor) · [Deploy to Vercel](#deploy-to-vercel) · [Verify](#development-and-verification) · [License](#author-and-license)
+
+## What's new in version 3.0
+
+The current interface is a compact photo editor with document controls, a canvas, repair settings and history. The earlier promotional header, slogans and decorative sections have been removed.
+
+Version 3.0 adds portable project files, applied-repair history, freehand lasso selection, selection expansion/contraction, adjustable overlay opacity, cancelable processing and PNG/JPEG/WebP export. The Windows default launcher now opens this editor; the original Python demonstration has its own separate launcher.
+
+<details>
+<summary>View comparison and mobile screenshots</summary>
+
+![Before-and-after comparison with repair history](docs/reframe-comparison.png)
+
+<img src="docs/reframe-mobile.png" alt="Reframe editor on a mobile screen" width="360">
+
+</details>
 
 ## Features
 
@@ -129,6 +155,21 @@ npm run test:browser
 ```
 
 You may instead set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to a supported Chromium executable.
+
+The version 3.0 update was verified with **12 unit tests and 7 browser tests**, plus a successful production build. These checks cover actual model inference and image export, not just interface rendering. The commands above let you repeat that validation locally; this is not a claim of a continuously running CI service.
+
+## Troubleshooting
+
+| Situation | What to check |
+| --- | --- |
+| Repair button reports an empty selection | Paint over an area or open **Test selections** and choose a preset. |
+| First MI-GAN repair takes longer | The browser must load the 28 MB model and its runtime. Keep the tab open, cancel if needed, or choose **Context fill**. |
+| Context radius is disabled | This control applies only to **Context fill**; the neural methods do not use it. |
+| Export becomes unavailable after changing settings | Repair again to create a candidate for the new settings. An already applied repair can still be exported. |
+| Project import fails | Use a `.reframe` file saved by this editor, under 40 MB. Imported images and masks must match the project's working dimensions. |
+| An imported mask is rejected | Match the working dimensions shown above the canvas. **Export mask** provides a correctly sized template. |
+| Scores are absent | Reference evaluation is disabled by default for uploaded images and after applying a repair. Enable it only for a genuinely clean reference. |
+| Vercel detects the Python demo | Choose **Vite**, keep the repository root as `./`, and use the committed root configuration. See [deployment instructions](DEPLOY_TO_VERCEL.md). |
 
 ### Source layout
 
