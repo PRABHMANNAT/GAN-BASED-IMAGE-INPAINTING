@@ -1,0 +1,101 @@
+{
+  "provenance": {
+    "architecture": "edge-unet-v1",
+    "kind": "educational GAN; not the report's trained model",
+    "training_data": "procedural facade illustrations only",
+    "seed": 42,
+    "training_size": 64,
+    "batch_size": 8,
+    "requested_steps": 300,
+    "learning_rate_g": 0.0003,
+    "learning_rate_d": 0.0001,
+    "loss": "10*hole_L1 + valid_L1 + 2*gradient_L1 + 0.05*adversarial_BCE",
+    "validation": "8 fixed synthetic image-mask pairs",
+    "limitations": "Tiny teaching model. Not validated for historical photographs; may blur or invent details."
+  },
+  "history": [
+    {
+      "step": 1,
+      "g_loss": 2.222820281982422,
+      "d_loss": 0.6934014558792114,
+      "validation_masked_mse": 0.043432604521512985
+    },
+    {
+      "step": 25,
+      "g_loss": 1.987531304359436,
+      "d_loss": 0.6930133700370789,
+      "validation_masked_mse": 0.045116543769836426
+    },
+    {
+      "step": 50,
+      "g_loss": 1.9100834131240845,
+      "d_loss": 0.6916341185569763,
+      "validation_masked_mse": 0.04268240928649902
+    },
+    {
+      "step": 75,
+      "g_loss": 1.8118534088134766,
+      "d_loss": 0.6868144273757935,
+      "validation_masked_mse": 0.04335978254675865
+    },
+    {
+      "step": 100,
+      "g_loss": 1.9796091318130493,
+      "d_loss": 0.6847630739212036,
+      "validation_masked_mse": 0.042605191469192505
+    },
+    {
+      "step": 125,
+      "g_loss": 1.980602502822876,
+      "d_loss": 0.6613179445266724,
+      "validation_masked_mse": 0.04272235929965973
+    },
+    {
+      "step": 150,
+      "g_loss": 1.9496394395828247,
+      "d_loss": 0.649836003780365,
+      "validation_masked_mse": 0.042372751981019974
+    },
+    {
+      "step": 175,
+      "g_loss": 1.9442163705825806,
+      "d_loss": 0.6476192474365234,
+      "validation_masked_mse": 0.04057099297642708
+    },
+    {
+      "step": 200,
+      "g_loss": 1.6565933227539062,
+      "d_loss": 0.6499035358428955,
+      "validation_masked_mse": 0.03629385307431221
+    },
+    {
+      "step": 225,
+      "g_loss": 1.5497597455978394,
+      "d_loss": 0.6564037799835205,
+      "validation_masked_mse": 0.03725062683224678
+    },
+    {
+      "step": 250,
+      "g_loss": 1.4697531461715698,
+      "d_loss": 0.650046706199646,
+      "validation_masked_mse": 0.03413506597280502
+    },
+    {
+      "step": 275,
+      "g_loss": 1.495927095413208,
+      "d_loss": 0.6241410374641418,
+      "validation_masked_mse": 0.03407237306237221
+    },
+    {
+      "step": 300,
+      "g_loss": 1.477953553199768,
+      "d_loss": 0.6112185716629028,
+      "validation_masked_mse": 0.03435749188065529
+    }
+  ],
+  "train": null,
+  "validation": null,
+  "selection": "Lowest masked MSE on the fixed validation batch; no test-set claim",
+  "torch_version": "2.15.0+cpu",
+  "numpy_version": "2.5.5"
+}
