@@ -1,67 +1,45 @@
 import "./style.css";
+import { validateProject, changeSelection, exportTypes } from "./project.js";
 import {
   createIcons,
-  ScanLine,
-  BookOpen,
-  Github,
-  ShieldCheck,
-  Sparkles,
-  Image as ImageIcon,
-  UploadCloud,
-  WandSparkles,
-  ScanSearch,
-  LockKeyhole,
-  Paintbrush,
-  Columns2,
-  Eraser,
-  SquareDashed,
-  Hand,
-  Undo2,
-  Redo2,
-  Trash2,
-  MoveHorizontal,
-  Minus,
-  Plus,
-  Maximize,
-  SlidersHorizontal,
+  Check,
+  CircleHelp,
   Download,
-  MousePointer2,
-  CheckCheck,
-  Cpu,
-  Split,
+  Eraser,
+  FolderOpen,
+  Hand,
+  ImagePlus,
+  Lasso,
+  Maximize,
+  Minus,
+  Paintbrush,
+  Plus,
+  Redo2,
+  Save,
+  ScanSearch,
+  SquareDashed,
+  Undo2,
   X,
 } from "lucide";
-
 createIcons({
   icons: {
-    ScanLine,
-    BookOpen,
-    Github,
-    ShieldCheck,
-    Sparkles,
-    Image: ImageIcon,
-    UploadCloud,
-    WandSparkles,
-    ScanSearch,
-    LockKeyhole,
-    Paintbrush,
-    Columns2,
-    Eraser,
-    SquareDashed,
-    Hand,
-    Undo2,
-    Redo2,
-    Trash2,
-    MoveHorizontal,
-    Minus,
-    Plus,
-    Maximize,
-    SlidersHorizontal,
+    Check,
+    CircleHelp,
     Download,
-    MousePointer2,
-    CheckCheck,
-    Cpu,
-    Split,
+    Eraser,
+    FolderOpen,
+    Hand,
+    ImagePlus,
+    Lasso,
+    Maximize,
+    Minus,
+    Paintbrush,
+    Plus,
+    Redo2,
+    Save,
+    ScanSearch,
+    SquareDashed,
+    Undo2,
     X,
   },
 });
@@ -96,6 +74,12 @@ const state = {
   strokeStart: null,
   lastPoint: null,
   rectBase: null,
+  lassoPoints: [],
+  lastBrushPoint: null,
+  steps: [],
+  stepIndex: 0,
+  dirty: false,
+  operation: 0,
 };
 let worker,
   sequence = 0,
@@ -116,17 +100,21 @@ function busy(value, label = "Processing image…") {
   state.busy = value;
   $("busy-overlay").hidden = !value;
   $("busy-label").textContent = label;
+  $("cancel-processing").hidden = !value || label.startsWith("Opening");
   document
     .querySelectorAll(
-      ".library button,.library input,.inspector button,.inspector input,.inspector select,.tools button,#clear",
+      ".library button,.library input,.inspector button,.inspector input,.inspector select,.tools button,#clear,#save-project,#open-project,#export-open",
     )
     .forEach((el) => (el.disabled = value));
   overlay.style.pointerEvents = value ? "none" : "auto";
   if (!value) {
     updateHistory();
-    $("download-result").disabled = !state.result;
-    $("download-record").disabled = !state.result;
+    $("download-result").disabled = !exportableImage();
+    $("download-record").disabled = !exportableRecord();
     $("radius").disabled = $("method").value !== "context";
+    $("export-quality").disabled = $("export-format").value === "png";
+    $("apply-result").disabled = !state.result;
+    $("export-open").disabled = !exportableImage();
   }
 }
 function startWorker() {
@@ -220,10 +208,10 @@ function renderMask() {
   for (let i = 0; i < state.mask.length; i++)
     if (state.mask[i]) {
       count++;
-      tint.data[i * 4] = 248;
-      tint.data[i * 4 + 1] = 142;
-      tint.data[i * 4 + 2] = 118;
-      tint.data[i * 4 + 3] = 165;
+      tint.data[i * 4] = 235;
+      tint.data[i * 4 + 1] = 147;
+      tint.data[i * 4 + 2] = 100;
+      tint.data[i * 4 + 3] = Math.round(Number($("mask-opacity").value) * 2.55);
     }
   oc.putImageData(tint, 0, 0);
   $("mask-coverage").textContent =
@@ -235,10 +223,13 @@ function invalidate() {
   state.result = null;
   state.metadata = null;
   $("compare-view").disabled = true;
-  $("download-result").disabled = true;
-  $("download-record").disabled = true;
+  $("download-result").disabled = !exportableImage();
+  $("download-record").disabled = !exportableRecord();
   $("result-stats").hidden = true;
   $("processing-time").textContent = "—";
+  $("apply-result").disabled = true;
+  $("export-open").disabled = !exportableImage();
+  markDirty();
   setView("edit");
 }
 function undo() {
@@ -275,8 +266,8 @@ function setView(view) {
   overlay.style.visibility =
     !compare && $("show-mask").checked ? "visible" : "hidden";
   $("canvas-label").lastChild.textContent = compare
-    ? " RESTORATION COMPARISON"
-    : " MASKING WORKSPACE";
+    ? " Comparison"
+    : " Selection";
   $("canvas-hint").textContent = compare
     ? "Move the slider to inspect the restoration"
     : "Paint over the regions you want to repair";
@@ -350,7 +341,11 @@ $("viewport").addEventListener("pointerdown", (event) => {
   )
     return;
   if (state.busy || !state.original || event.button !== 0) return;
-  if (state.tool === "pan" || state.space || state.view === "compare") {
+  $("viewport").focus({ preventScroll: true });
+  if (state.view === "compare" && !state.space && state.tool !== "pan") {
+    state.pointer = { kind: "compare", id: event.pointerId };
+    compareAt(event);
+  } else if (state.tool === "pan" || state.space) {
     state.pointer = {
       kind: "pan",
       id: event.pointerId,
@@ -365,9 +360,14 @@ $("viewport").addEventListener("pointerdown", (event) => {
     state.strokeStart = p;
     state.lastPoint = p;
     state.pointer = { kind: "draw", id: event.pointerId };
-    if (state.tool === "rectangle")
+    if (state.tool === "rectangle" || state.tool === "lasso") {
       state.rectBase = mc.getImageData(0, 0, state.width, state.height);
-    else drawStroke(p, p);
+      if (state.tool === "lasso") state.lassoPoints = [p];
+    } else
+      drawStroke(
+        event.shiftKey && state.lastBrushPoint ? state.lastBrushPoint : p,
+        p,
+      );
   }
   $("viewport").setPointerCapture(event.pointerId);
   event.preventDefault();
@@ -375,6 +375,10 @@ $("viewport").addEventListener("pointerdown", (event) => {
 $("viewport").addEventListener("pointermove", (event) => {
   const pointer = state.pointer;
   if (!pointer || pointer.id !== event.pointerId) return;
+  if (pointer.kind === "compare") {
+    compareAt(event);
+    return;
+  }
   if (pointer.kind === "pan") {
     state.x = pointer.x + event.clientX - pointer.clientX;
     state.y = pointer.y + event.clientY - pointer.clientY;
@@ -392,13 +396,56 @@ $("viewport").addEventListener("pointermove", (event) => {
       Math.abs(p[1] - state.strokeStart[1]),
     );
     readMask();
+  } else if (state.tool === "lasso") {
+    state.lassoPoints.push(p);
+    mc.putImageData(state.rectBase, 0, 0);
+    mc.strokeStyle = "white";
+    mc.lineWidth = 1;
+    mc.beginPath();
+    state.lassoPoints.forEach(([x, y], index) =>
+      index ? mc.lineTo(x, y) : mc.moveTo(x, y),
+    );
+    mc.stroke();
+    const preview = oc.createImageData(state.width, state.height),
+      pixels = mc.getImageData(0, 0, state.width, state.height).data;
+    for (let i = 0; i < pixels.length; i += 4)
+      if (pixels[i] >= 128) {
+        preview.data[i] = 235;
+        preview.data[i + 1] = 147;
+        preview.data[i + 2] = 100;
+        preview.data[i + 3] = 190;
+      }
+    oc.putImageData(preview, 0, 0);
   } else drawStroke(state.lastPoint, p);
   state.lastPoint = p;
 });
 for (const type of ["pointerup", "pointercancel", "lostpointercapture"])
   $("viewport").addEventListener(type, () => {
+    if (
+      state.pointer?.kind === "draw" &&
+      state.tool === "lasso" &&
+      state.rectBase
+    ) {
+      mc.putImageData(state.rectBase, 0, 0);
+      if (type === "pointerup" && state.lassoPoints.length > 2) {
+        mc.fillStyle = "white";
+        mc.beginPath();
+        state.lassoPoints.forEach(([x, y], index) =>
+          index ? mc.lineTo(x, y) : mc.moveTo(x, y),
+        );
+        mc.closePath();
+        mc.fill();
+        readMask();
+      } else renderMask();
+    }
+    if (
+      state.pointer?.kind === "draw" &&
+      ["brush", "eraser"].includes(state.tool)
+    )
+      state.lastBrushPoint = state.lastPoint?.slice();
     state.pointer = null;
     state.rectBase = null;
+    state.lassoPoints = [];
   });
 $("viewport").addEventListener(
   "wheel",
@@ -437,10 +484,18 @@ async function loadFile(
       bitmap.close();
       throw new Error("Choose an image at least 32 × 32 pixels.");
     }
-    state.originalSize = [bitmap.width, bitmap.height];
     const scale = Math.min(1200 / bitmap.width, 1200 / bitmap.height, 1);
-    state.width = Math.max(1, Math.round(bitmap.width * scale));
-    state.height = Math.max(1, Math.round(bitmap.height * scale));
+    const workingWidth = Math.max(1, Math.round(bitmap.width * scale));
+    const workingHeight = Math.max(1, Math.round(bitmap.height * scale));
+    if (Math.min(workingWidth, workingHeight) < 32) {
+      bitmap.close();
+      throw new Error(
+        "This image is too narrow. The resized working copy must be at least 32 pixels on each side.",
+      );
+    }
+    state.originalSize = [bitmap.width, bitmap.height];
+    state.width = workingWidth;
+    state.height = workingHeight;
     for (const canvas of [source, overlay, resultCanvas, maskCanvas]) {
       canvas.width = state.width;
       canvas.height = state.height;
@@ -454,6 +509,7 @@ async function loadFile(
     state.filename = name;
     state.undo = [];
     state.redo = [];
+    state.lastBrushPoint = null;
     restoreMaskPixels();
     renderMask();
     invalidate();
@@ -466,6 +522,17 @@ async function loadFile(
     $("file-thumb").src = source.toDataURL("image/jpeg", 0.5);
     $("canvas-size").textContent = `${state.width} × ${state.height} px`;
     $("clean-reference").checked = clean;
+    $("document-title").textContent = name;
+    state.steps = [
+      {
+        image: cloneImage(state.original),
+        label: "Opened image",
+        metadata: null,
+      },
+    ];
+    state.stepIndex = 0;
+    renderRepairHistory();
+    markSaved();
     document
       .querySelectorAll("[data-sample]")
       .forEach((el) =>
@@ -528,6 +595,292 @@ function stat(label, value) {
   return box;
 }
 
+function markDirty() {
+  state.dirty = true;
+  $("dirty-state").hidden = false;
+}
+function markSaved() {
+  state.dirty = false;
+  $("dirty-state").hidden = true;
+}
+function cloneImage(image) {
+  return new ImageData(
+    new Uint8ClampedArray(image.data),
+    image.width,
+    image.height,
+  );
+}
+function exportableImage() {
+  return (
+    state.result ||
+    ((state.stepIndex > 0 || state.steps[state.stepIndex]?.metadata) &&
+      state.original) ||
+    null
+  );
+}
+function exportableRecord() {
+  return state.metadata || state.steps[state.stepIndex]?.metadata || null;
+}
+function imageURL(image) {
+  const c = document.createElement("canvas");
+  c.width = image.width;
+  c.height = image.height;
+  c.getContext("2d").putImageData(image, 0, 0);
+  return c.toDataURL("image/png");
+}
+function compareAt(event) {
+  const rect = $("image-stage").getBoundingClientRect();
+  $("compare-range").value = Math.max(
+    0,
+    Math.min(100, ((event.clientX - rect.left) / rect.width) * 100),
+  );
+  updateCompare();
+}
+function renderRepairHistory() {
+  $("history-count").textContent = String(state.steps.length);
+  $("repair-history").replaceChildren(
+    ...state.steps.map((step, index) => {
+      const button = document.createElement("button");
+      button.className =
+        "history-item" + (index === state.stepIndex ? " active" : "");
+      button.setAttribute("aria-pressed", String(index === state.stepIndex));
+      button.disabled = state.busy;
+      const thumb = document.createElement("canvas");
+      thumb.width = 80;
+      thumb.height = 60;
+      const full = document.createElement("canvas");
+      full.width = state.width;
+      full.height = state.height;
+      full.getContext("2d").putImageData(step.image, 0, 0);
+      thumb.getContext("2d").drawImage(full, 0, 0, 80, 60);
+      const img = document.createElement("img");
+      img.src = thumb.toDataURL("image/jpeg", 0.65);
+      img.alt = "";
+      const text = document.createElement("span"),
+        title = document.createElement("strong"),
+        note = document.createElement("small");
+      title.textContent = step.label;
+      note.textContent =
+        index === state.stepIndex
+          ? "Current working image"
+          : `Step ${index + 1}`;
+      text.append(title, note);
+      button.append(img, text);
+      button.onclick = () => selectRepairStep(index);
+      return button;
+    }),
+  );
+}
+function selectRepairStep(index) {
+  if (state.busy || !state.steps[index]) return;
+  state.stepIndex = index;
+  state.original = cloneImage(state.steps[index].image);
+  sc.putImageData(state.original, 0, 0);
+  state.mask.fill(0);
+  state.undo = [];
+  state.redo = [];
+  state.lastBrushPoint = null;
+  restoreMaskPixels();
+  renderMask();
+  invalidate();
+  updateHistory();
+  renderRepairHistory();
+  $("file-thumb").src = source.toDataURL("image/jpeg", 0.6);
+  $("clean-reference").checked = false;
+  feedback("Working image changed. Select the next region to repair.");
+}
+function applyRepair() {
+  if (!state.result || state.busy) return;
+  const names = {
+    migan: "MI-GAN",
+    context: "Context fill",
+    gan: "Edge-guided GAN",
+  };
+  state.steps = state.steps.slice(0, state.stepIndex + 1);
+  state.steps.push({
+    image: cloneImage(state.result),
+    label: `${names[state.metadata?.method] || "Imported"} repair`,
+    metadata: state.metadata,
+  });
+  if (state.steps.length > 8) state.steps.shift();
+  selectRepairStep(state.steps.length - 1);
+  feedback(
+    "Repair applied. Select another region, or return to an earlier step in history.",
+  );
+}
+function cancelProcessing() {
+  if (!state.busy || !pending.size) return;
+  state.operation++;
+  worker.terminate();
+  for (const request of pending.values()) {
+    clearTimeout(request.timer);
+    const error = new Error("Processing cancelled.");
+    error.name = "AbortError";
+    request.reject(error);
+  }
+  pending.clear();
+  busy(false);
+  startWorker();
+  feedback("Processing cancelled. Your image and selection are unchanged.");
+}
+function projectSettings() {
+  return {
+    method: $("method").value,
+    radius: Number($("radius").value),
+    feather: Number($("feather").value),
+    strength: Number($("strength").value),
+    brushSize: Number($("brush-size").value),
+    maskOpacity: Number($("mask-opacity").value),
+    sensitivity: Number($("sensitivity").value),
+    cleanReference: $("clean-reference").checked,
+  };
+}
+async function saveProject() {
+  if (state.busy || !state.original) return;
+  restoreMaskPixels();
+  const project = {
+    format: "reframe-project",
+    version: 1,
+    width: state.width,
+    height: state.height,
+    sourceName: state.filename,
+    image: imageURL(state.original),
+    mask: maskCanvas.toDataURL("image/png"),
+    candidate: state.result ? imageURL(state.result) : null,
+    metadata: state.metadata,
+    settings: projectSettings(),
+    history: state.steps.map((step) => ({
+      image: imageURL(step.image),
+      label: step.label,
+      metadata: step.metadata,
+    })),
+    historyIndex: state.stepIndex,
+  };
+  let blob = new Blob([JSON.stringify(project)], { type: "application/json" });
+  while (blob.size > 40 * 1024 * 1024 && project.history.length > 1) {
+    if (project.historyIndex > 0) {
+      project.history.shift();
+      project.historyIndex--;
+    } else project.history.pop();
+    blob = new Blob([JSON.stringify(project)], { type: "application/json" });
+  }
+  if (blob.size > 40 * 1024 * 1024) {
+    feedback(
+      "Project exceeds 40 MB. Export the image and start a smaller project.",
+      true,
+    );
+    return;
+  }
+  download(blob, `${baseName()}.reframe`);
+  markSaved();
+  toast(
+    project.history.length < state.steps.length
+      ? `Project saved with ${project.history.length} repair steps to stay below 40 MB.`
+      : "Project saved.",
+  );
+}
+async function decodeProjectImage(url, width, height) {
+  const bitmap = await createImageBitmap(await (await fetch(url)).blob());
+  if (bitmap.width !== width || bitmap.height !== height) {
+    bitmap.close();
+    throw new Error("An embedded image does not match the project dimensions.");
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  context.drawImage(bitmap, 0, 0);
+  bitmap.close();
+  return context.getImageData(0, 0, width, height);
+}
+async function openProject(file) {
+  if (state.busy || !file) return;
+  if (file.size > 40 * 1024 * 1024) {
+    feedback("Project files must be smaller than 40 MB.", true);
+    return;
+  }
+  busy(true, "Opening project…");
+  try {
+    const p = validateProject(JSON.parse(await file.text()));
+    const [image, mask, candidate, ...steps] = await Promise.all([
+      decodeProjectImage(p.image, p.width, p.height),
+      decodeProjectImage(p.mask, p.width, p.height),
+      p.candidate
+        ? decodeProjectImage(p.candidate, p.width, p.height)
+        : Promise.resolve(null),
+      ...p.history.map((step) =>
+        decodeProjectImage(step.image, p.width, p.height),
+      ),
+    ]);
+    state.width = p.width;
+    state.height = p.height;
+    state.original = image;
+    state.originalSize = [p.width, p.height];
+    state.filename = p.sourceName;
+    state.mask = new Uint8Array(p.width * p.height);
+    for (let i = 0; i < state.mask.length; i++)
+      state.mask[i] = mask.data[i * 4] >= 128 ? 255 : 0;
+    state.undo = [];
+    state.redo = [];
+    state.lastBrushPoint = null;
+    state.steps = p.history.map((step, index) => ({
+      ...step,
+      image: steps[index],
+    }));
+    state.stepIndex = p.historyIndex;
+    for (const canvas of [source, overlay, resultCanvas, maskCanvas]) {
+      canvas.width = p.width;
+      canvas.height = p.height;
+    }
+    sc.putImageData(image, 0, 0);
+    restoreMaskPixels();
+    renderMask();
+    invalidate();
+    const ids = {
+      radius: "radius",
+      feather: "feather",
+      strength: "strength",
+      brushSize: "brush-size",
+      maskOpacity: "mask-opacity",
+      sensitivity: "sensitivity",
+    };
+    $("method").value = p.settings.method;
+    $("method").dispatchEvent(new Event("change"));
+    for (const [key, id] of Object.entries(ids)) {
+      $(id).value = p.settings[key];
+      $(id).dispatchEvent(new Event("input"));
+    }
+    $("clean-reference").checked = p.settings.cleanReference;
+    $("filename").textContent = p.sourceName;
+    $("document-title").textContent = p.sourceName;
+    $("file-size").textContent = "Saved project";
+    $("file-thumb").src = source.toDataURL("image/jpeg", 0.6);
+    $("canvas-size").textContent = `${p.width} × ${p.height} px`;
+    document
+      .querySelectorAll("[data-sample]")
+      .forEach((el) => el.classList.remove("active"));
+    if (candidate) {
+      state.result = candidate;
+      state.metadata = p.metadata;
+      resultCanvas.getContext("2d").putImageData(candidate, 0, 0);
+      $("compare-view").disabled = false;
+      setView("compare");
+    }
+    renderRepairHistory();
+    renderMask();
+    updateHistory();
+    fit();
+    markSaved();
+    feedback(
+      "Project opened. Your image, selection, settings and repair history are restored.",
+    );
+  } catch (error) {
+    feedback(`Cannot open project. ${error.message}`, true);
+  } finally {
+    busy(false);
+  }
+}
+
 async function restore() {
   if (state.busy || !state.original) return;
   const count = state.mask.reduce((a, b) => a + (b ? 1 : 0), 0);
@@ -546,6 +899,7 @@ async function restore() {
     return;
   }
   const method = $("method").value;
+  const operation = ++state.operation;
   busy(true, "Preparing restoration…");
   feedback("Restoring the selected regions on your device…");
   try {
@@ -564,6 +918,7 @@ async function restore() {
       method,
       settings,
     });
+    if (operation !== state.operation) return;
     state.result = new ImageData(
       new Uint8ClampedArray(response.rgba),
       state.width,
@@ -580,6 +935,7 @@ async function restore() {
       source_sha256: await sha256(state.original.data),
       mask_sha256: await sha256(state.mask),
     };
+    markDirty();
     $("compare-view").disabled = false;
     $("compare-range").value = "50";
     setView("compare");
@@ -603,7 +959,8 @@ async function restore() {
       "Restoration ready. Move the comparison slider and review the details.",
     );
   } catch (error) {
-    feedback(`Could not restore: ${error.message}`, true);
+    if (error.name !== "AbortError")
+      feedback(`Could not restore: ${error.message}`, true);
   } finally {
     busy(false);
   }
@@ -612,6 +969,7 @@ async function restore() {
 async function detect() {
   if (state.busy || !state.original) return;
   busy(true, "Looking for thin scratches…");
+  const operation = ++state.operation;
   try {
     const response = await callWorker({
       type: "detect",
@@ -620,6 +978,7 @@ async function detect() {
       height: state.height,
       settings: { sensitivity: Number($("sensitivity").value) },
     });
+    if (operation !== state.operation) return;
     const found = new Uint8Array(response.mask);
     const count = found.reduce((a, b) => a + (b ? 1 : 0), 0);
     if (!count) {
@@ -654,7 +1013,8 @@ async function detect() {
       "Scratch suggestions added. Review the mask and erase any real image details.",
     );
   } catch (error) {
-    feedback(`Detection failed: ${error.message}`, true);
+    if (error.name !== "AbortError")
+      feedback(`Detection failed: ${error.message}`, true);
   } finally {
     busy(false);
   }
@@ -775,16 +1135,34 @@ $("save-mask").onclick = async () => {
   toast("Binary mask saved.");
 };
 $("download-result").onclick = () => {
-  if (!state.result) return;
-  resultCanvas.toBlob((blob) => {
-    download(blob, `${baseName()}-restored.png`);
-    toast("Restored image saved.");
-  }, "image/png");
+  if (!exportableImage()) return;
+  const type = exportTypes[$("export-format").value] || exportTypes.png;
+  const exportCanvas = state.result ? resultCanvas : source;
+  exportCanvas.toBlob(
+    (blob) => {
+      if (!blob) {
+        feedback("The browser could not encode this image.", true);
+        return;
+      }
+      if (blob.type !== type.mime) {
+        feedback(
+          "This browser does not support the selected export format. Choose PNG instead.",
+          true,
+        );
+        return;
+      }
+      download(blob, `${baseName()}-restored.${type.extension}`);
+      toast("Image exported.");
+    },
+    type.mime,
+    Number($("export-quality").value) / 100,
+  );
 };
 $("download-record").onclick = () => {
-  if (!state.metadata) return;
+  const record = exportableRecord();
+  if (!record) return;
   download(
-    new Blob([JSON.stringify(state.metadata, null, 2)], {
+    new Blob([JSON.stringify(record, null, 2)], {
       type: "application/json",
     }),
     `${baseName()}-record.json`,
@@ -799,6 +1177,7 @@ for (const [id, suffix] of [
   ["sensitivity", ""],
 ]) {
   $(id).addEventListener("input", () => {
+    markDirty();
     $(`${id}-value`).textContent = $(id).value + suffix;
     if (id === "brush-size")
       $("brush-preview-dot").style.width = $("brush-preview-dot").style.height =
@@ -810,19 +1189,20 @@ for (const [id, suffix] of [
   });
 }
 const methodDescriptions = {
-  migan:
-    "Pretrained on natural scenes. Reconstructs plausible detail for missing areas. First run loads a 28 MB model.",
+  migan: "For missing areas and objects. First use loads a 28 MB model.",
   context:
-    "Fast distance-ordered repair from nearby visible pixels. Best for thin scratches and smooth areas. No neural model download.",
-  gan: "A five-channel edge-guided U-Net trained on synthetic illustrations. Educational comparison; limited photo quality.",
+    "Fills from nearby pixels. Use for narrow scratches and smooth areas. Context radius controls the neighbourhood.",
+  gan: "Experimental model trained on sample illustrations. Limited results on photographs.",
 };
 $("method").onchange = () => {
+  markDirty();
   $("method-description").textContent = methodDescriptions[$("method").value];
   $("radius").disabled = $("method").value !== "context";
   if (state.result) invalidate();
   feedback("Method changed. Select a region and restore.");
 };
 $("clean-reference").onchange = () => {
+  markDirty();
   if (state.result) {
     invalidate();
     feedback("Reference setting changed. Restore again to update the scores.");
@@ -844,9 +1224,14 @@ $("guide").addEventListener("click", (event) => {
   }
 });
 document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && state.busy) {
+    cancelProcessing();
+    return;
+  }
   if (
     ["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement.tagName) ||
-    $("guide").open
+    $("guide").open ||
+    $("about").open
   )
     return;
   if (event.code === "Space") {
@@ -855,6 +1240,11 @@ document.addEventListener("keydown", (event) => {
     return;
   }
   if (state.busy) return;
+  if (
+    event.key === "Enter" &&
+    document.activeElement.closest('button,a,summary,[role="button"]')
+  )
+    return;
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
     event.preventDefault();
     event.shiftKey ? redo() : undo();
@@ -865,7 +1255,13 @@ document.addEventListener("keydown", (event) => {
     redo();
     return;
   }
-  const tools = { b: "brush", e: "eraser", r: "rectangle", h: "pan" };
+  const tools = {
+    b: "brush",
+    e: "eraser",
+    r: "rectangle",
+    l: "lasso",
+    h: "pan",
+  };
   if (tools[event.key.toLowerCase()]) setTool(tools[event.key.toLowerCase()]);
   if (event.key === "[" || event.key === "]") {
     $("brush-size").value = Math.max(
@@ -897,3 +1293,59 @@ new ResizeObserver(() => {
 startWorker();
 loadSample("facade");
 $("radius").disabled = true;
+
+$("mask-opacity").oninput = () => {
+  $("mask-opacity-value").textContent = $("mask-opacity").value + "%";
+  if (state.mask) renderMask();
+  markDirty();
+};
+for (const [id, operation] of [
+  ["grow-mask", "expand"],
+  ["shrink-mask", "contract"],
+])
+  $(id).onclick = () => {
+    if (!state.mask || state.busy) return;
+    remember();
+    state.mask = changeSelection(
+      state.mask,
+      state.width,
+      state.height,
+      operation,
+      2,
+    );
+    restoreMaskPixels();
+    renderMask();
+    invalidate();
+    feedback(
+      operation === "expand"
+        ? "Selection expanded by 2 pixels."
+        : "Selection contracted by 2 pixels.",
+    );
+  };
+$("apply-result").onclick = applyRepair;
+$("save-project").onclick = saveProject;
+$("open-project").onclick = () => $("project-upload").click();
+$("project-upload").onchange = (event) => {
+  const file = event.target.files[0];
+  event.target.value = "";
+  openProject(file);
+};
+$("cancel-processing").onclick = cancelProcessing;
+$("export-format").onchange = () => {
+  $("export-quality").disabled = $("export-format").value === "png";
+};
+$("export-quality").oninput = () => {
+  $("export-quality-value").textContent = $("export-quality").value + "%";
+};
+$("export-open").onclick = () => {
+  $("export-section").scrollIntoView({ behavior: "smooth", block: "center" });
+  $("export-format").focus();
+};
+$("about-open").onclick = () => $("about").showModal();
+$("about-close").onclick = () => $("about").close();
+$("dropzone").addEventListener("keydown", (event) => {
+  if (event.key === "Enter" || event.code === "Space") {
+    event.preventDefault();
+    if (!state.busy) $("image-upload").click();
+  }
+});

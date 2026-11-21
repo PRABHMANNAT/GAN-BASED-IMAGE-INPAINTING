@@ -12,7 +12,7 @@ Use Python **3.11, 3.12 or 3.13**. No GPU, API key, account, or external image s
 
 ### Windows - simplest option
 
-Double-click **`start_windows.bat`**. It creates `.venv`, installs dependencies, and opens the local app. Keep the terminal open while using it. The first installation can take several minutes because PyTorch is included.
+Double-click **`start_python_demo_windows.bat`**. It creates `.venv`, installs dependencies, and opens the local app. Keep the terminal open while using it. The first installation can take several minutes because PyTorch is included.
 
 ### Any platform - terminal
 
@@ -109,7 +109,7 @@ static/style.css       Responsive styling; no remote fonts or scripts
 checkpoints/demo.pt    Trained synthetic teaching checkpoint
 checkpoints/demo.json  Training provenance, settings and logged losses
 tests/test_demo.py     Pipeline, leakage, preservation and API checks
-start_windows.bat      First-run setup and launcher
+start_python_demo_windows.bat      First-run setup and launcher
 ```
 
 ## Verify

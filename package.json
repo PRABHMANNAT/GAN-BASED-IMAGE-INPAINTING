@@ -1,6 +1,6 @@
 {
   "name": "reframe-studio-workspace",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "private": true,
   "scripts": {
     "postinstall": "npm --prefix web ci",
@@ -11,6 +11,8 @@
     "test:browser": "npm --prefix web run test:browser"
   },
   "engines": {
-    "node": ">=22"
-  }
+    "node": ">=22.12.0"
+  },
+  "author": "PRABHMANNAT SINGH",
+  "license": "MIT"
 }

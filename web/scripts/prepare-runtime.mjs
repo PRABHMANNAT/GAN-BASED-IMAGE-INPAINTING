@@ -6,6 +6,10 @@ const target = path.join(root, "public/runtime");
 await mkdir(target, { recursive: true });
 const licenses = path.join(target, "licenses");
 await mkdir(licenses, { recursive: true });
+await copyFile(
+  path.join(root, "../LICENSE"),
+  path.join(licenses, "reframe.txt"),
+);
 for (const [pkg, filename, label] of [
   ["@techstark/opencv-js", "LICENSE", "opencv"],
   ["lucide", "LICENSE", "lucide"],

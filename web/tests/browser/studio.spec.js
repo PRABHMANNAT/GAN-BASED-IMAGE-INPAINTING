@@ -16,6 +16,7 @@ test("real browser repair, export, canvas tools and responsive layout", async ({
   await expect(page.locator("#feedback")).toContainText(
     "Mark a damaged region",
   );
+  await page.getByText("Test selections", { exact: true }).click();
   await page.locator("#preset-scratch").click();
   const coverage = await page.locator("#mask-coverage").textContent();
   await page.locator("#undo").click();
@@ -44,6 +45,7 @@ test("real browser repair, export, canvas tools and responsive layout", async ({
   await expect(page.locator("#zoom-value")).not.toHaveText("Fit");
   await page.locator("#fit").click();
   await expect(page.locator("#zoom-value")).toHaveText("Fit");
+  await page.getByText("Scratch detection", { exact: true }).click();
   await page.locator("#detect").click();
   await expect(page.locator("#busy-overlay")).toBeHidden({ timeout: 60000 });
   await expect(page.locator("#feedback")).not.toContainText("failed");
@@ -66,15 +68,14 @@ test("uploaded images default to no clean reference and settings invalidate stal
   await page.goto("/");
   await expect(page.locator("#feedback")).toContainText("Ready.");
   const response = await page.request.get("/samples/coast.jpg");
-  await page
-    .locator("#image-upload")
-    .setInputFiles({
-      name: "my-photo.jpg",
-      mimeType: "image/jpeg",
-      buffer: await response.body(),
-    });
+  await page.locator("#image-upload").setInputFiles({
+    name: "my-photo.jpg",
+    mimeType: "image/jpeg",
+    buffer: await response.body(),
+  });
   await expect(page.locator("#filename")).toHaveText("my-photo.jpg");
   await expect(page.locator("#clean-reference")).not.toBeChecked();
+  await page.getByText("Test selections", { exact: true }).click();
   await page.locator("#preset-hole").click();
   await page.locator("#method").selectOption("context");
   await page.locator("#restore").click();

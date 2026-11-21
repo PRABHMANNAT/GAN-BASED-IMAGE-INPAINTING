@@ -258,7 +258,7 @@ self.onmessage = async (event) => {
         for (let c = 0; c < 4; c++)
           if (result[i * 4 + c] !== rgba[i * 4 + c]) preserved = false;
     const metadata = {
-      app: "Reframe Studio 2.0",
+      app: "Reframe 3.0",
       created_utc: new Date().toISOString(),
       method,
       model,
